@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"time"
 
 	taskdomain "example.com/taskservice/internal/domain/task"
 )
@@ -12,24 +13,39 @@ type Repository interface {
 	Update(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]taskdomain.Task, error)
+	ListTemplates(ctx context.Context) ([]taskdomain.Task, error)
+	ListInstances(ctx context.Context, parentID int64) ([]taskdomain.Task, error)
+	ListByRecurrenceType(ctx context.Context, recurrenceType string) ([]taskdomain.Task, error)
+	ListByParentAndType(ctx context.Context, parentID int64, recurrenceType string) ([]taskdomain.Task, error) // Добавлен
+	InstanceExists(ctx context.Context, templateID int64, date time.Time) (bool, error)
 }
 
 type Usecase interface {
-	Create(ctx context.Context, input CreateInput) (*taskdomain.Task, error)
+	Create(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error)
 	GetByID(ctx context.Context, id int64) (*taskdomain.Task, error)
-	Update(ctx context.Context, id int64, input UpdateInput) (*taskdomain.Task, error)
+	Update(ctx context.Context, task *taskdomain.Task) (*taskdomain.Task, error)
 	Delete(ctx context.Context, id int64) error
 	List(ctx context.Context) ([]taskdomain.Task, error)
+	ListTemplates(ctx context.Context) ([]taskdomain.Task, error)
+	ListInstances(ctx context.Context, parentID int64) ([]taskdomain.Task, error)
+	ListByRecurrenceType(ctx context.Context, recurrenceType string) ([]taskdomain.Task, error)
+	ListByParentAndType(ctx context.Context, parentID int64, recurrenceType string) ([]taskdomain.Task, error) // Добавлен
+	InstanceExists(ctx context.Context, templateID int64, date time.Time) (bool, error)
+	GenerateInstances(ctx context.Context, templateID int64, fromDate, toDate *time.Time) (int, error)
 }
 
 type CreateInput struct {
-	Title       string
-	Description string
-	Status      taskdomain.Status
+	Title            string
+	Description      string
+	Status           taskdomain.Status
+	RecurrenceType   string
+	RecurrenceConfig *taskdomain.RecurrenceConfig
 }
 
 type UpdateInput struct {
-	Title       string
-	Description string
-	Status      taskdomain.Status
+	Title            string
+	Description      string
+	Status           taskdomain.Status
+	RecurrenceType   string
+	RecurrenceConfig *taskdomain.RecurrenceConfig
 }

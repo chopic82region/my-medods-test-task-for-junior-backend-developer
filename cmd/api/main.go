@@ -2,92 +2,97 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	infrastructurepostgres "example.com/taskservice/internal/infrastructure/postgres"
-	postgresrepo "example.com/taskservice/internal/repository/postgres"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	taskrepository "example.com/taskservice/internal/repository/postgres"
 	transporthttp "example.com/taskservice/internal/transport/http"
 	swaggerdocs "example.com/taskservice/internal/transport/http/docs"
 	httphandlers "example.com/taskservice/internal/transport/http/handlers"
-	"example.com/taskservice/internal/usecase/task"
+	taskusecase "example.com/taskservice/internal/usecase/task"
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	// Инициализация логгера
+	logger := log.New(os.Stdout, "[TASK-SERVICE] ", log.LstdFlags|log.Lshortfile)
 
-	cfg := loadConfig()
+	// Загрузка конфигурации
+	dbURL := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/taskservice?sslmode=disable")
+	serverAddr := getEnv("SERVER_ADDR", ":8080")
 
+	// Создание контекста с отменой для graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := infrastructurepostgres.Open(ctx, cfg.DatabaseDSN)
+	// Подключение к БД
+	dbPool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		logger.Error("open postgres", "error", err)
-		os.Exit(1)
+		logger.Fatalf("Unable to connect to database: %v", err)
 	}
-	defer pool.Close()
+	defer dbPool.Close()
 
-	taskRepo := postgresrepo.New(pool)
-	taskUsecase := task.NewService(taskRepo)
-	taskHandler := httphandlers.NewTaskHandler(taskUsecase)
+	// Проверка подключения (ИСПРАВЛЕНО)
+	if err := dbPool.Ping(ctx); err != nil {
+		logger.Fatalf("Unable to ping database: %v", err)
+	}
+	logger.Println("Successfully connected to database")
+
+	// Инициализация компонентов (ИСПРАВЛЕНО)
+	taskRepo := taskrepository.New(dbPool)
+	taskService := taskusecase.NewService(taskRepo)         // Исправлено: taskusecase.NewService
+	taskHandler := httphandlers.NewTaskHandler(taskService) // Исправлено: передан taskService
 	docsHandler := swaggerdocs.NewHandler()
+
+	// Настройка роутера
 	router := transporthttp.NewRouter(taskHandler, docsHandler)
 
-	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           router,
-		ReadHeaderTimeout: 5 * time.Second,
+	// Настройка HTTP сервера
+	srv := &http.Server{
+		Addr:         serverAddr,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
+	// Запуск планировщика
+	scheduler := taskusecase.NewScheduler(taskService, logger)
+	scheduler.Start(ctx)
+	defer scheduler.Stop()
+
+	// Запуск HTTP сервера
 	go func() {
-		<-ctx.Done()
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			logger.Error("shutdown http server", "error", err)
+		logger.Printf("Starting HTTP server on %s", serverAddr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatalf("Could not start server: %v", err)
 		}
 	}()
 
-	logger.Info("http server started", "addr", cfg.HTTPAddr)
+	// Ожидание сигнала завершения
+	<-ctx.Done()
+	logger.Println("Shutting down server...")
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Error("listen and serve", "error", err)
-		os.Exit(1)
-	}
-}
+	// Graceful shutdown
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-type config struct {
-	HTTPAddr    string
-	DatabaseDSN string
-}
-
-func loadConfig() config {
-	cfg := config{
-		HTTPAddr:    envOrDefault("HTTP_ADDR", ":8081"),
-		DatabaseDSN: envOrDefault("DATABASE_DSN", "postgres://postgres:postgres@localhost:5432/taskservice?sslmode=disable"),
+	scheduler.Stop()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Printf("Server shutdown error: %v", err)
 	}
 
-	if cfg.DatabaseDSN == "" {
-		panic(fmt.Errorf("DATABASE_DSN is required"))
-	}
-
-	return cfg
+	logger.Println("Server exited gracefully")
 }
 
-func envOrDefault(key, fallback string) string {
+func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
-
-	return fallback
+	return defaultValue
 }
