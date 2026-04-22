@@ -56,15 +56,19 @@ http://localhost:8081/swagger/openapi.json
 
 Добавлено: 
 
-🔄 Поддержка периодических задач:
-    -daily	Ежедневные задачи (каждый n-й день)	{"interval": N}
-    -monthly	Ежемесячные задачи на определенные числа	{"days": [5, 20]}
-    -specific_dates	Задачи на конкретные даты	{"dates": ["2026-05-01", "2026-05-15"]}
-    -even_odd	Задачи на четные/нечетные дни	{"parity": "even"} или "odd"
+# 🔄 Поддержка периодических задач:
 
-Примеры:
+-daily	Ежедневные задачи (каждый n-й день)	{"interval": N}
+    
+-monthly	Ежемесячные задачи на определенные числа	{"days": [5, 20]}
+    
+-specific_dates	Задачи на конкретные даты	{"dates": ["2026-05-01", "2026-05-15"]}
 
--Создание ежедневной задачи:
+-even_odd	Задачи на четные/нечетные дни	{"parity": "even"} или "odd"
+
+# Примеры
+
+# Создание ежедневной задачи:
 
 curl -X POST http://localhost:8080/api/v1/tasks \
     -H "Content-Type: application/json" \
@@ -78,7 +82,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
     }
   }'
 
--Создание задачи с переодичностью:
+# Создание задачи с переодичностью:
 
 curl -X POST http://localhost:8080/api/v1/tasks \
   -H "Content-Type: application/json" \
@@ -92,7 +96,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
     }
   }'
 
--Создание ежемесячной задачи:
+# Создание ежемесячной задачи:
 
 curl -X POST http://localhost:8080/api/v1/tasks \
   -H "Content-Type: application/json" \
@@ -106,7 +110,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
     }
   }'
 
--Создание ежемесячной задачи (5-го и 20-го числа):
+# Создание ежемесячной задачи (5-го и 20-го числа):
 
 curl -X POST http://localhost:8080/api/v1/tasks \
   -H "Content-Type: application/json" \
@@ -120,7 +124,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
     }
   }'
 
--Создание задачи на конкретные даты:
+# Создание задачи на конкретные даты:
 
 curl -X POST http://localhost:8080/api/v1/tasks \
   -H "Content-Type: application/json" \
@@ -134,7 +138,7 @@ curl -X POST http://localhost:8080/api/v1/tasks \
     }
   }'
 
-Новые миграции: 
+# Новые миграции: 
 
 -- Добавление полей для периодичности
 ALTER TABLE tasks ADD COLUMN recurrence_type VARCHAR(20) NOT NULL DEFAULT 'none';
@@ -146,7 +150,7 @@ COMMENT ON COLUMN tasks.recurrence_type IS 'Тип периодичности: n
 COMMENT ON COLUMN tasks.recurrence_config IS 'JSON с параметрами периодичности';
 COMMENT ON COLUMN tasks.parent_task_id IS 'ID шаблона-родителя для периодических задач';
 
-🧪 Тестирование
+# 🧪 Тестирование
 Юнит-тесты
 В проекте реализованы юнит-тесты для проверки логики:
 
