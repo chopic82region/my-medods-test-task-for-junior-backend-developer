@@ -3,7 +3,7 @@
   "info": {
     "title": "Task Service API",
     "version": "1.0.0",
-    "description": "CRUD API for tasks built with clean architecture."
+    "description": "CRUD API for tasks with recurrence support. Supports daily, monthly, specific dates, and even/odd day recurrence."
   },
   "servers": [
     {
@@ -13,14 +13,31 @@
   "tags": [
     {
       "name": "Tasks",
-      "description": "Operations with tasks"
+      "description": "Operations with tasks (supports recurring tasks)"
     }
   ],
   "paths": {
     "/api/v1/tasks": {
       "get": {
         "tags": ["Tasks"],
-        "summary": "List tasks",
+        "summary": "List tasks with optional filtering",
+        "parameters": [
+          {
+            "name": "parent_task_id",
+            "in": "query",
+            "schema": { "type": "integer", "format": "int64" },
+            "description": "Filter by parent template ID to get task instances"
+          },
+          {
+            "name": "recurrence_type",
+            "in": "query",
+            "schema": { 
+              "type": "string",
+              "enum": ["daily", "monthly", "specific_dates", "even_odd"]
+            },
+            "description": "Filter tasks by recurrence type"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Task list",
@@ -37,7 +54,7 @@
       },
       "post": {
         "tags": ["Tasks"],
-        "summary": "Create task",
+        "summary": "Create task (simple or recurring template)",
         "requestBody": {
           "required": true,
           "content": {
@@ -169,12 +186,97 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "new"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "enum": ["none", "daily", "monthly", "specific_dates", "even_odd"],
+            "description": "Type of recurrence. Omit or set to 'none' for simple tasks.",
+            "example": "daily"
+          },
+          "recurrence_config": {
+            "type": "object",
+            "description": "Configuration for recurrence. Required if recurrence_type is set.",
+            "oneOf": [
+              {
+                "title": "Daily config",
+                "properties": {
+                  "interval": { "type": "integer", "minimum": 1, "example": 3 }
+                }
+              },
+              {
+                "title": "Monthly config",
+                "properties": {
+                  "days": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 30 }, "example": [5, 20] }
+                }
+              },
+              {
+                "title": "Specific dates config",
+                "properties": {
+                  "dates": { "type": "array", "items": { "type": "string", "format": "date" }, "example": ["2026-05-01", "2026-05-15"] }
+                }
+              },
+              {
+                "title": "Even/Odd config",
+                "properties": {
+                  "parity": { "type": "string", "enum": ["even", "odd"], "example": "even" }
+                }
+              }
+            ]
+          }
+        },
+        "examples": {
+          "simple_task": {
+            "summary": "Simple task without recurrence",
+            "value": {
+              "title": "Review pull request",
+              "description": "Check code changes and merge",
+              "status": "new"
+            }
+          },
+          "daily_task": {
+            "summary": "Daily recurring task",
+            "value": {
+              "title": "Daily standup",
+              "description": "Join team daily meeting",
+              "status": "new",
+              "recurrence_type": "daily",
+              "recurrence_config": { "interval": 1 }
+            }
+          },
+          "monthly_task": {
+            "summary": "Monthly recurring task",
+            "value": {
+              "title": "Monthly report",
+              "description": "Generate monthly sales report",
+              "status": "new",
+              "recurrence_type": "monthly",
+              "recurrence_config": { "days": [5, 20] }
+            }
+          },
+          "specific_dates_task": {
+            "summary": "Task on specific dates",
+            "value": {
+              "title": "Client meeting",
+              "description": "Meeting with important client",
+              "status": "new",
+              "recurrence_type": "specific_dates",
+              "recurrence_config": { "dates": ["2026-05-01", "2026-05-15"] }
+            }
+          },
+          "even_days_task": {
+            "summary": "Task on even days of month",
+            "value": {
+              "title": "Inventory check",
+              "description": "Check warehouse inventory",
+              "status": "new",
+              "recurrence_type": "even_odd",
+              "recurrence_config": { "parity": "even" }
+            }
           }
         }
       },
       "UpdateTaskRequest": {
         "type": "object",
-        "required": ["title", "status"],
         "properties": {
           "title": {
             "type": "string",
@@ -188,6 +290,15 @@
             "type": "string",
             "enum": ["new", "in_progress", "done"],
             "example": "in_progress"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "enum": ["none", "daily", "monthly", "specific_dates", "even_odd"],
+            "description": "Type of recurrence"
+          },
+          "recurrence_config": {
+            "type": "object",
+            "description": "Configuration for recurrence"
           }
         }
       },
@@ -196,24 +307,21 @@
         "properties": {
           "id": { "type": "integer", "format": "int64", "example": 1 },
           "title": { "type": "string", "example": "Prepare release" },
-          "description": {
-            "type": "string",
-            "example": "Collect release notes and check migrations"
+          "description": { "type": "string", "example": "Collect release notes and check migrations" },
+          "status": { "type": "string", "enum": ["new", "in_progress", "done"], "example": "new" },
+          "created_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" },
+          "updated_at": { "type": "string", "format": "date-time", "example": "2026-03-24T00:00:00Z" },
+          "recurrence_type": { "type": "string", "enum": ["none", "daily", "monthly", "specific_dates", "even_odd"], "example": "daily" },
+          "recurrence_config": {
+            "type": "object",
+            "description": "Recurrence configuration",
+            "example": { "interval": 1 }
           },
-          "status": {
-            "type": "string",
-            "enum": ["new", "in_progress", "done"],
-            "example": "new"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-03-24T00:00:00Z"
+          "parent_task_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of parent template for task instances",
+            "example": 5
           }
         }
       },
