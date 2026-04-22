@@ -6,7 +6,6 @@ import (
 	taskdomain "example.com/taskservice/internal/domain/task"
 )
 
-// Убрано дублирование taskMutationDTO, оставлена только одна структура
 type taskMutationDTO struct {
 	Title            string                       `json:"title"`
 	Description      string                       `json:"description"`
@@ -37,13 +36,11 @@ func newTaskDTO(task *taskdomain.Task) taskDTO {
 		UpdatedAt:   task.UpdatedAt,
 	}
 
-	// Добавляем поля периодичности, если они есть
 	if task.RecurrenceType != "" && task.RecurrenceType != "none" {
 		dto.RecurrenceType = task.RecurrenceType
 		dto.RecurrenceConfig = &task.RecurrenceConfig
 	}
 
-	// Добавляем ParentTaskID, если задача является экземпляром
 	if task.ParentTaskID != nil {
 		dto.ParentTaskID = task.ParentTaskID
 	}

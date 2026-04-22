@@ -24,7 +24,7 @@ func main() {
 
 	// Загрузка конфигурации
 	dbURL := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/taskservice?sslmode=disable")
-	serverAddr := getEnv("SERVER_ADDR", ":8080")
+	serverAddr := getEnv("SERVER_ADDR", ":8081")
 
 	// Создание контекста с отменой для graceful shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -45,11 +45,10 @@ func main() {
 
 	// Инициализация компонентов (ИСПРАВЛЕНО)
 	taskRepo := taskrepository.New(dbPool)
-	taskService := taskusecase.NewService(taskRepo)         // Исправлено: taskusecase.NewService
-	taskHandler := httphandlers.NewTaskHandler(taskService) // Исправлено: передан taskService
+	taskService := taskusecase.NewService(taskRepo) // taskRepo, а не taskRepository
+	taskHandler := httphandlers.NewTaskHandler(taskService)
 	docsHandler := swaggerdocs.NewHandler()
 
-	// Настройка роутера
 	router := transporthttp.NewRouter(taskHandler, docsHandler)
 
 	// Настройка HTTP сервера
